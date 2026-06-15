@@ -23,23 +23,23 @@ db.exec(`
     duration REAL,
     thumbnail TEXT,
     hls_ready INTEGER NOT NULL DEFAULT 0,
+    session_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
 
-// Add hls_ready column if it doesn't exist (for existing DBs)
-try {
-  db.exec('ALTER TABLE videos ADD COLUMN hls_ready INTEGER NOT NULL DEFAULT 0');
-} catch (e) {
-  // Column already exists, ignore
+for (const col of ['hls_ready', 'session_id']) {
+  try {
+    db.exec(`ALTER TABLE videos ADD COLUMN ${col} TEXT`);
+  } catch (e) {}
 }
 
-function insertVideo({ id, filename, originalName, mimeType, size, width, height, fps, duration, thumbnail }) {
+function insertVideo({ id, filename, originalName, mimeType, size, width, height, fps, duration, thumbnail, sessionId }) {
   const stmt = db.prepare(`
-    INSERT INTO videos (id, filename, original_name, mime_type, size, width, height, fps, duration, thumbnail)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO videos (id, filename, original_name, mime_type, size, width, height, fps, duration, thumbnail, session_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  stmt.run(id, filename, originalName, mimeType, size, width, height, fps, duration, thumbnail);
+  stmt.run(id, filename, originalName, mimeType, size, width, height, fps, duration, thumbnail, sessionId || null);
 }
 
 function getVideo(id) {
@@ -48,6 +48,10 @@ function getVideo(id) {
 
 function getAllVideos() {
   return db.prepare('SELECT * FROM videos ORDER BY created_at DESC').all();
+}
+
+function getVideosBySession(sessionId) {
+  return db.prepare('SELECT * FROM videos WHERE session_id = ? ORDER BY created_at DESC').all(sessionId);
 }
 
 function deleteVideo(id) {
@@ -69,4 +73,4 @@ function updateVideo(id, fields) {
   db.prepare(`UPDATE videos SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
 }
 
-module.exports = { insertVideo, getVideo, getAllVideos, deleteVideo, setHlsReady, updateVideo };
+module.exports = { insertVideo, getVideo, getAllVideos, getVideosBySession, deleteVideo, setHlsReady, updateVideo };

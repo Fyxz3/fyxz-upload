@@ -1,4 +1,5 @@
 const express = require('express');
+const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -9,6 +10,13 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PROCESSING_LOCKS = new Set();
+
+app.use(session({
+  secret: nanoid(40),
+  resave: false,
+  saveUninitialized: true,
+  cookie: { maxAge: 365 * 24 * 60 * 60 * 1000 }
+}));
 
 function getBaseUrl(req) {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -237,6 +245,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
     const id = nanoid(11);
     const isGif = path.extname(req.file.originalname).toLowerCase() === '.gif';
+    const sessionId = req.session.id;
 
     db.insertVideo({
       id,
@@ -245,7 +254,8 @@ app.post('/upload', upload.single('file'), (req, res) => {
       mimeType: isGif ? 'image/gif' : 'video/mp4',
       size: stat.size,
       width: null, height: null, fps: null, duration: null,
-      thumbnail: null
+      thumbnail: null,
+      sessionId
     });
 
     if (!isGif) {
@@ -353,7 +363,8 @@ app.get('/api/video/:id', (req, res) => {
 });
 
 app.get('/api/videos', (req, res) => {
-  res.json(db.getAllVideos());
+  const sessionId = req.session.id;
+  res.json(db.getVideosBySession(sessionId));
 });
 
 app.delete('/api/video/:id', (req, res) => {
