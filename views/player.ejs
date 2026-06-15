@@ -122,14 +122,6 @@
       background: #1f6f3a;
       border-color: #3fb950;
     }
-    .hls-loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #8b949e;
-      font-size: 0.9rem;
-    }
     .error-page {
       text-align: center;
       padding: 80px 20px;
@@ -167,8 +159,6 @@
         </video>
         <% if (hlsReady) { %>
         <div class="hls-badge">HLS</div>
-        <% } else { %>
-        <div class="hls-loading" id="hlsLoading">Preparing stream...</div>
         <% } %>
       </div>
       <div class="player-info">
@@ -198,40 +188,16 @@
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const video = document.getElementById('player');
-    const loading = document.getElementById('hlsLoading');
     const hlsReady = <%= hlsReady ? 'true' : 'false' %>;
     const hlsUrl = '<%= hlsUrl %>';
 
-    if (video && hlsReady) {
-      if (Hls.isSupported()) {
-        const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
-        hls.loadSource(hlsUrl);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(() => {});
-        });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = hlsUrl;
-        video.addEventListener('loadedmetadata', () => {
-          video.play().catch(() => {});
-        });
-      }
-    } else if (video && !hlsReady) {
-      const checkHls = setInterval(async () => {
-        try {
-          const r = await fetch('/api/video/<%= video ? video.id : '' %>');
-          const d = await r.json();
-          if (d.hls_ready === 1) {
-            clearInterval(checkHls);
-            if (loading) loading.style.display = 'none';
-            if (Hls.isSupported()) {
-              const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
-              hls.loadSource(hlsUrl);
-              hls.attachMedia(video);
-            }
-          }
-        } catch (e) {}
-      }, 3000);
+    if (hlsReady && Hls.isSupported()) {
+      const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
     }
 
     const copyBtn = document.getElementById('copyLinkBtn');
