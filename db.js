@@ -58,4 +58,15 @@ function setHlsReady(id, ready) {
   return db.prepare('UPDATE videos SET hls_ready = ? WHERE id = ?').run(ready ? 1 : 0, id);
 }
 
-module.exports = { insertVideo, getVideo, getAllVideos, deleteVideo, setHlsReady };
+function updateVideo(id, fields) {
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(fields)) {
+    sets.push(`${k} = ?`);
+    vals.push(v);
+  }
+  vals.push(id);
+  db.prepare(`UPDATE videos SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+}
+
+module.exports = { insertVideo, getVideo, getAllVideos, deleteVideo, setHlsReady, updateVideo };

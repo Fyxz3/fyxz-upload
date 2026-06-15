@@ -8,6 +8,7 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const PROCESSING_LOCKS = new Set();
 
 function getBaseUrl(req) {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -149,109 +150,106 @@ function evalFps(fpsStr) {
   return d ? n / d : null;
 }
 
-app.post('/upload', upload.single('file'), async (req, res) => {
+async function processVideo(videoId, filePath) {
+  if (PROCESSING_LOCKS.has(videoId)) return;
+  PROCESSING_LOCKS.add(videoId);
+
+  try {
+    const probe = await getFFprobeData(filePath);
+    const videoStream = probe.streams?.find(s => s.codec_type === 'video');
+    let width = null, height = null, fps = null, duration = null;
+    let needsProcessing = false;
+
+    if (videoStream) {
+      width = videoStream.width || null;
+      height = videoStream.height || null;
+      fps = evalFps(videoStream.r_frame_rate || videoStream.avg_frame_rate);
+      duration = parseFloat(probe.format?.duration || videoStream.duration || 0);
+
+      if ((width > 1920 || height > 1080) || fps > 60) needsProcessing = true;
+    }
+
+    let finalPath = filePath;
+
+    if (needsProcessing) {
+      let newPath = path.join(UPLOADS_DIR, `${nanoid(16)}.mp4`);
+      const ffmpeg = getFFmpegPath();
+      const args = ['-i', filePath];
+      if (width > 1920 || height > 1080)
+        args.push('-vf', 'scale=\'min(1920,iw)\':\'min(1080,ih)\':force_original_aspect_ratio=decrease');
+      if (fps > 60) args.push('-r', '60');
+      args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23');
+      args.push('-c:a', 'aac', '-b:a', '128k');
+      args.push('-movflags', '+faststart', '-y', newPath);
+
+      await new Promise((resolve, reject) => {
+        const proc = spawn(ffmpeg, args);
+        proc.on('close', (code) => code === 0 ? resolve() : reject());
+        proc.on('error', reject);
+      });
+
+      fs.unlinkSync(filePath);
+      finalPath = newPath;
+
+      const probe2 = await getFFprobeData(finalPath);
+      const vs = probe2.streams?.find(s => s.codec_type === 'video');
+      if (vs) {
+        width = vs.width || null;
+        height = vs.height || null;
+        fps = evalFps(vs.r_frame_rate || vs.avg_frame_rate);
+        duration = parseFloat(probe2.format?.duration || vs.duration || 0);
+      }
+    }
+
+    const thumbnailName = `${nanoid(12)}.jpg`;
+    const ok = await generateThumbnail(finalPath, path.join(THUMBS_DIR, thumbnailName));
+    const stat = fs.statSync(finalPath);
+
+    db.updateVideo(videoId, {
+      filename: path.basename(finalPath),
+      width, height,
+      fps: fps ? Math.round(fps) : null,
+      duration: duration ? Math.round(duration * 100) / 100 : null,
+      size: stat.size,
+      thumbnail: ok ? thumbnailName : null
+    });
+
+    convertToHLS(finalPath, HLS_DIR, videoId).then(() => {
+      db.setHlsReady(videoId, true);
+    }).catch(() => {});
+  } catch (e) {
+    console.error(`Processing error for ${videoId}:`, e.message);
+  } finally {
+    PROCESSING_LOCKS.delete(videoId);
+  }
+}
+
+app.post('/upload', upload.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const filePath = req.file.path;
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const isGif = ext === '.gif';
-    let width = null, height = null, fps = null, duration = null;
-    let finalPath = filePath;
-    let finalName = req.file.filename;
-    let mimeType = isGif ? 'image/gif' : 'video/mp4';
-    let needsProcessing = false;
-
-    if (!isGif) {
-      try {
-        const probe = await getFFprobeData(filePath);
-        const videoStream = probe.streams?.find(s => s.codec_type === 'video');
-        if (videoStream) {
-          width = videoStream.width || null;
-          height = videoStream.height || null;
-          fps = evalFps(videoStream.r_frame_rate || videoStream.avg_frame_rate);
-          duration = parseFloat(probe.format?.duration || videoStream.duration || 0);
-
-          if ((width > 1920 || height > 1080) || fps > 60) {
-            needsProcessing = true;
-          }
-        }
-
-        if (needsProcessing) {
-          const newPath = path.join(UPLOADS_DIR, `${nanoid(16)}.mp4`);
-          const ffmpeg = getFFmpegPath();
-          const args = ['-i', filePath];
-          if (width > 1920 || height > 1080) {
-            args.push('-vf', 'scale=\'min(1920,iw)\':\'min(1080,ih)\':force_original_aspect_ratio=decrease');
-          }
-          if (fps > 60) args.push('-r', '60');
-          args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23');
-          args.push('-c:a', 'aac', '-b:a', '128k');
-          args.push('-movflags', '+faststart');
-          args.push('-y', newPath);
-
-          await new Promise((resolve, reject) => {
-            const proc = spawn(ffmpeg, args);
-            proc.on('close', (code) => code === 0 ? resolve() : reject(new Error('Processing failed')));
-            proc.on('error', reject);
-          });
-
-          fs.unlinkSync(filePath);
-          finalPath = newPath;
-          finalName = path.basename(newPath);
-          mimeType = 'video/mp4';
-
-          const probe2 = await getFFprobeData(finalPath);
-          const vs = probe2.streams?.find(s => s.codec_type === 'video');
-          if (vs) {
-            width = vs.width || null;
-            height = vs.height || null;
-            fps = evalFps(vs.r_frame_rate || vs.avg_frame_rate);
-            duration = parseFloat(probe2.format?.duration || vs.duration || 0);
-          }
-        }
-      } catch (e) {
-        console.warn('Probe/process warning:', e.message);
-      }
-    }
-
-    if (!needsProcessing) {
-      const stat = fs.statSync(finalPath);
-      if (stat.size > MAX_SIZE) {
-        fs.unlinkSync(finalPath);
-        return res.status(413).json({ error: 'File too large' });
-      }
-    }
-
-    let thumbnailName = null;
-    if (!isGif) {
-      thumbnailName = `${nanoid(12)}.jpg`;
-      const ok = await generateThumbnail(finalPath, path.join(THUMBS_DIR, thumbnailName));
-      if (!ok) thumbnailName = null;
+    const stat = fs.statSync(filePath);
+    if (stat.size > MAX_SIZE) {
+      fs.unlinkSync(filePath);
+      return res.status(413).json({ error: 'File too large' });
     }
 
     const id = nanoid(11);
+    const isGif = path.extname(req.file.originalname).toLowerCase() === '.gif';
 
     db.insertVideo({
       id,
-      filename: finalName,
+      filename: req.file.filename,
       originalName: req.file.originalname,
-      mimeType,
-      size: fs.statSync(finalPath).size,
-      width, height,
-      fps: fps ? Math.round(fps) : null,
-      duration: duration ? Math.round(duration * 100) / 100 : null,
-      thumbnail: thumbnailName
+      mimeType: isGif ? 'image/gif' : 'video/mp4',
+      size: stat.size,
+      width: null, height: null, fps: null, duration: null,
+      thumbnail: null
     });
 
-    // Start HLS conversion in background (non-blocking)
     if (!isGif) {
-      convertToHLS(finalPath, HLS_DIR, id).then(() => {
-        db.setHlsReady(id, true);
-        console.log(`HLS ready for ${id}`);
-      }).catch(err => {
-        console.error(`HLS failed for ${id}:`, err.message);
-      });
+      processVideo(id, filePath);
     }
 
     const baseUrl = getBaseUrl(req);
@@ -260,11 +258,8 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       id,
       url: `${baseUrl}/v/${id}`,
       direct: `${baseUrl}/raw/${id}`,
-      filename: finalName,
-      width, height,
-      fps: fps ? Math.round(fps) : null,
-      duration: duration ? Math.round(duration * 100) / 100 : null,
-      size: fs.statSync(finalPath).size
+      filename: req.file.filename,
+      size: stat.size
     });
 
   } catch (err) {
