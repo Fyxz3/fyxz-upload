@@ -109,8 +109,6 @@ function showResult(data) {
 
   uploadContent.style.display = 'block';
   uploadProgress.style.display = 'none';
-
-  loadRecent();
 }
 
 function showError(msg) {
@@ -143,33 +141,6 @@ uploadAnother.addEventListener('click', () => {
   fileInput.value = '';
 });
 
-async function loadRecent() {
-  try {
-    const res = await fetch('/api/videos');
-    const videos = await res.json();
-    if (!videos.length) {
-      recentList.innerHTML = '<div class="recent-empty">No uploads yet</div>';
-      return;
-    }
-    recentList.innerHTML = videos.slice(0, 10).map(v => {
-      const meta = [];
-      if (v.width && v.height) meta.push(`${v.width}x${v.height}`);
-      if (v.fps) meta.push(`${v.fps}fps`);
-      if (v.duration) meta.push(formatDuration(v.duration));
-      meta.push(formatSize(v.size));
-      return `
-        <div class="recent-item">
-          <div class="recent-item-info">
-            <div class="recent-item-name">${escapeHtml(v.original_name)}</div>
-            <div class="recent-item-meta">${meta.join(' &bull; ')}</div>
-          </div>
-          <a href="/v/${v.id}" class="recent-item-link" target="_blank">View &#8599;</a>
-        </div>
-      `;
-    }).join('');
-  } catch (e) {}
-}
-
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -188,5 +159,3 @@ function escapeHtml(str) {
   d.textContent = str;
   return d.innerHTML;
 }
-
-loadRecent();
