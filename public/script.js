@@ -8,10 +8,8 @@ const progressText = document.getElementById('progressText');
 const progressDetail = document.getElementById('progressDetail');
 const result = document.getElementById('result');
 const resultUrl = document.getElementById('resultUrl');
-const resultDirect = document.getElementById('resultDirect');
 const resultInfo = document.getElementById('resultInfo');
 const copyBtn = document.getElementById('copyBtn');
-const copyDirectBtn = document.getElementById('copyDirectBtn');
 const uploadAnother = document.getElementById('uploadAnother');
 const recentList = document.getElementById('recentList');
 
@@ -101,7 +99,6 @@ function showResult(data) {
   result.style.display = 'block';
 
   resultUrl.value = data.url;
-  resultDirect.value = data.direct;
 
   let info = `${data.filename}`;
   if (data.width && data.height) info += ` &bull; ${data.width}x${data.height}`;
@@ -128,7 +125,6 @@ function showError(msg) {
 }
 
 copyBtn.addEventListener('click', () => copyText(resultUrl.value, copyBtn));
-copyDirectBtn.addEventListener('click', () => copyText(resultDirect.value, copyDirectBtn));
 
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
