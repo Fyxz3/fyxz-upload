@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="twitter:card" content="player">
+  <meta name="twitter:title" content="<%= video ? video.original_name : 'Video' %> - Fyxz Upload">
+  <meta name="twitter:description" content="<%= video ? video.original_name : 'Watch this video on Fyxz Upload' %>">
+  <meta name="twitter:player" content="<%= directUrl %>">
+  <meta name="twitter:player:width" content="<%= video ? Math.min(video.width || 1280, 1920) : 1280 %>">
+  <meta name="twitter:player:height" content="<%= video ? Math.min(video.height || 720, 1080) : 720 %>">
+  <meta name="twitter:player:stream" content="<%= directUrl %>">
+  <meta name="twitter:player:stream:content_type" content="<%= video ? video.mime_type : 'video/mp4' %>">
+  <% if (thumbUrl) { %>
+  <meta name="twitter:image" content="<%= thumbUrl %>">
+  <% } %>
+
+  <meta property="og:type" content="video.other">
+  <meta property="og:title" content="<%= video ? video.original_name : 'Video' %> - Fyxz Upload">
+  <meta property="og:description" content="<%= video ? video.original_name : 'Watch this video on Fyxz Upload' %>">
+  <meta property="og:video" content="<%= directUrl %>">
+  <meta property="og:video:type" content="<%= video ? video.mime_type : 'video/mp4' %>">
+  <meta property="og:video:width" content="<%= video ? Math.min(video.width || 1280, 1920) : 1280 %>">
+  <meta property="og:video:height" content="<%= video ? Math.min(video.height || 720, 1080) : 720 %>">
+  <% if (thumbUrl) { %>
+  <meta property="og:image" content="<%= thumbUrl %>">
+  <% } %>
+  <meta property="og:url" content="<%= `${baseUrl}/v/${video ? video.id : ''}` %>">
+
+  <meta name="theme-color" content="#a855f7">
+  <title><%= video ? video.original_name : 'Video not found' %> - Fyxz Upload</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .player-page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .player-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .player-header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #c9d1d9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .player-header .brand {
+      font-size: 1.1rem;
+    }
+    .player-wrapper {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .player-wrapper video {
+      display: block;
+      width: 100%;
+      max-height: 80vh;
+      background: #000;
+    }
+    .hls-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(168,85,247,0.9);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+    }
+    .player-info {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .player-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+    .player-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .player-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .player-actions button,
+    .player-actions a {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .player-actions button:hover,
+    .player-actions a:hover {
+      background: #30363d;
+    }
+    .player-actions .copied {
+      background: #1f6f3a;
+      border-color: #3fb950;
+    }
+    .hls-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+    .error-page {
+      text-align: center;
+      padding: 80px 20px;
+    }
+    .error-page h2 {
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+    .error-page p {
+      color: #8b949e;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #58a6ff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="player-page">
+    <% if (!video) { %>
+      <div class="error-page">
+        <h2>Video not found</h2>
+        <p>The video you're looking for doesn't exist or has been removed.</p>
+        <a href="/" class="back-link">&larr; Upload a video</a>
+      </div>
+    <% } else { %>
+      <div class="player-header">
+        <h1><span class="brand">Fyxz</span> Upload &mdash; <%= video.original_name %></h1>
+      </div>
+      <div class="player-wrapper">
+        <video id="player" controls playsinline preload="metadata" poster="<%= thumbUrl || '' %>">
+          <source src="<%= directUrl %>" type="<%= video.mime_type || 'video/mp4' %>">
+        </video>
+        <% if (hlsReady) { %>
+        <div class="hls-badge">HLS</div>
+        <% } else { %>
+        <div class="hls-loading" id="hlsLoading">Preparing stream...</div>
+        <% } %>
+      </div>
+      <div class="player-info">
+        <div class="player-meta">
+          <span><%= video.original_name %></span>
+          <% if (video.width && video.height) { %>
+          <span><%= video.width %>x<%= video.height %></span>
+          <% } %>
+          <% if (video.fps) { %>
+          <span><%= video.fps %>fps</span>
+          <% } %>
+          <% if (video.duration) { %>
+          <span>
+            <% const m = Math.floor(video.duration / 60); const s = Math.floor(video.duration % 60); %>
+            <%= m ? m + 'm ' : '' %><%= s %>s
+          </span>
+          <% } %>
+        </div>
+        <div class="player-actions">
+          <button id="copyLinkBtn">Copy Link</button>
+          <a href="<%= directUrl %>" download>Download</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const video = document.getElementById('player');
+    const loading = document.getElementById('hlsLoading');
+    const hlsReady = <%= hlsReady ? 'true' : 'false' %>;
+    const hlsUrl = '<%= hlsUrl %>';
+
+    if (video && hlsReady) {
+      if (Hls.isSupported()) {
+        const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = hlsUrl;
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(() => {});
+        });
+      }
+    } else if (video && !hlsReady) {
+      const checkHls = setInterval(async () => {
+        try {
+          const r = await fetch('/api/video/<%= video ? video.id : '' %>');
+          const d = await r.json();
+          if (d.hls_ready === 1) {
+            clearInterval(checkHls);
+            if (loading) loading.style.display = 'none';
+            if (Hls.isSupported()) {
+              const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+              hls.loadSource(hlsUrl);
+              hls.attachMedia(video);
+            }
+          }
+        } catch (e) {}
+      }, 3000);
+    }
+
+    const copyBtn = document.getElementById('copyLinkBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy Link';
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

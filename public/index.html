@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fyxz Upload</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span class="brand">Fyxz</span> Upload</h1>
+      <p class="subtitle">Upload and share videos instantly</p>
+    </header>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-content" id="uploadContent">
+        <div class="upload-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="upload-text">Drag & drop your video here</p>
+        <p class="upload-hint">or click to browse &bull; MP4, MOV, AVI, WEBM, WMV, MKV</p>
+        <p class="upload-limit">Max 500MB &bull; 1080p 60fps</p>
+        <input type="file" id="fileInput" accept="video/*" hidden>
+        <button class="browse-btn" id="browseBtn">Choose Video</button>
+      </div>
+      <div class="upload-progress" id="uploadProgress" style="display:none">
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p class="progress-text" id="progressText">Uploading...</p>
+        <p class="progress-detail" id="progressDetail">Starting...</p>
+      </div>
+    </div>
+
+    <div class="result" id="result" style="display:none">
+      <div class="result-header">
+        <span class="check-mark">&#10003;</span>
+        <span>Upload complete!</span>
+      </div>
+      <div class="result-info" id="resultInfo"></div>
+      <div class="result-actions">
+        <div class="link-row">
+          <input type="text" id="resultUrl" readonly>
+          <button class="copy-btn" id="copyBtn" data-copy="url">Copy Link</button>
+        </div>
+        <div class="link-row">
+          <input type="text" id="resultDirect" readonly>
+          <button class="copy-btn" id="copyDirectBtn" data-copy="direct">Copy Direct</button>
+        </div>
+      </div>
+      <button class="upload-another" id="uploadAnother">Upload Another</button>
+    </div>
+
+    <div class="recent" id="recent">
+      <h2>Recent Uploads</h2>
+      <div class="recent-list" id="recentList"></div>
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>
